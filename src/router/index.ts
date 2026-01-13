@@ -12,7 +12,7 @@ const routes = [
     }
   },
   {
-    path: '/tables',
+    path: '/data',
     name: 'data',
     component: TablesView,
     meta: {
@@ -30,7 +30,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  document.title = `Vue.js ${to.meta.title} | XML Upload Dashboard`
+  document.title = `Registration - ${to.meta.title || ''}`
   next()
 })
 

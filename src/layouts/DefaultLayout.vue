@@ -7,7 +7,7 @@ import SidebarArea from '@/components/Sidebar/SidebarArea.vue'
   <!-- ===== Page Wrapper Start ===== -->
   <div class="flex h-screen overflow-hidden">
     <!-- ===== Sidebar Start ===== -->
-    <SidebarArea />
+    <!-- <SidebarArea /> -->
     <!-- ===== Sidebar End ===== -->
 
     <!-- ===== Content Area Start ===== -->

@@ -99,8 +99,13 @@ const sidebarStore = useSidebarStore()
             <!-- Dark Mode Toggler -->
             <!-- <DarkModeSwitcher /> -->
             <!-- Dark Mode Toggler -->
+             <router-link to="/" class="text-lg font-bold">Dashboard</router-link>
+             
           </li>
-
+          <li>
+            <router-link to="/data" class="text-lg font-bold">Data</router-link>
+          </li>
+          
           <!-- Notification Menu Area -->
           <!-- <DropdownNotification /> -->
           <!-- Notification Menu Area -->
