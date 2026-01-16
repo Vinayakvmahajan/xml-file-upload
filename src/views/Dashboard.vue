@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saveRegistrationBulk } from '@/service/xmlUploadService'
 import { ref, computed } from 'vue'
 import * as XLSX from 'xlsx'
 
@@ -173,12 +174,12 @@ const validateAll = () => {
       //   cellErrors.value[key] = 'Invalid Soldier Type'
 
       /* DOB */
-      if (target === 'Date of Birth') {
-        const normalized = parseDOB(val)
-        if (!normalized)
-          cellErrors.value[key] = 'Invalid or ambiguous DOB'
-        else row[src] = normalized
-      }
+      // if (target === 'Date of Birth') {
+      //   const normalized = parseDOB(val)
+      //   if (!normalized)
+      //     cellErrors.value[key] = 'Invalid or ambiguous DOB'
+      //   else row[src] = normalized
+      // }
     })
   })
 }
@@ -202,7 +203,7 @@ const deleteRow = (i: number) => {
 }
 
 /* ===================== FINAL SUBMIT ===================== */
-const finalUpload = () => {
+const finalUpload = async () => {
   validateAll()
 
   if (hasErrors.value) {
@@ -220,8 +221,54 @@ const finalUpload = () => {
     return obj
   })
 
-  console.log('FINAL PAYLOAD:', payload)
-  alert('Registration data saved successfully.')
+  console.log('Before FINAL PAYLOAD:', payload)
+
+  try {
+    loading.value = true
+
+   const requestPayload = payload.map(row => ({
+    name: String(row['Name'] ?? '').trim(),
+    dob: String(row['Date of Birth'] ?? ''),
+    gender: String(row['Gender'] ?? '').trim(),
+    rank: row['Rank'] !== '' && row['Rank'] !== null
+      ? Number(row['Rank'])
+      : null,
+    armynumber: String(row['Army No'] ?? '').trim(),
+    unit: row['Unit Name'] !== '' && row['Unit Name'] !== null
+      ? Number(row['Unit Name'])
+      : null,
+    company: row['COY / Batch Name'] !== '' && row['COY / Batch Name'] !== null
+      ? Number(row['COY / Batch Name'])
+      : null,
+    soldiertype: String(row['Soldier Type'] ?? '').trim(),
+    posting: 'POSTED',
+    chestnumber: String(row['RFID Chest No'] ?? '').trim(),
+    coyBatchName: String(row['COY / Batch Name'] ?? '').trim(),
+    active: true
+  }))
+
+   console.log('After FINAL PAYLOAD:', requestPayload)
+
+   const response = await saveRegistrationBulk(requestPayload)
+   console.log('FINAL RESPONSE:', response)
+    if(response){
+      alert('Records saved successfully.')
+      // Reset state
+      selectedFile.value = null
+      previewRows.value = []
+      previewColumns.value = []
+      showPreview.value = false
+      columnMapping.value = {}
+    } else {
+      alert('Error saving records.')
+    }
+    
+
+  } catch (err) {
+    alert('Server error while saving')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

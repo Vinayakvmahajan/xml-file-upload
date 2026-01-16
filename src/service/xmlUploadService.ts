@@ -1,15 +1,5 @@
-import axiosInstance from "@/plugins/axios"
+import axiosInstance from '@/plugins/axios'
 
-
-const API_URL = '/api/xml/upload'
-
-export const uploadXmlFile = async (file: File) => {
-  const formData = new FormData()
-  formData.append('file', file)
-
-  return axiosInstance.post(API_URL, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
+export const saveRegistrationBulk = (payload: any[]) => {
+  return axiosInstance.post('/api/registration/bulk', payload)
 }
