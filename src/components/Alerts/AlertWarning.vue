@@ -19,8 +19,7 @@
     <div class="w-full">
       <h5 class="mb-3 text-lg font-bold text-[#9D5425]">Attention needed</h5>
       <p class="leading-relaxed text-[#D0915C]">
-        Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has
-        been the industry's standard dummy text ever since the 1500s, when
+       Under development feature. Please contact admin for further assistance.
       </p>
     </div>
   </div>

@@ -1,5 +1,16 @@
+<script setup lang="ts">
+defineProps<{
+  show: boolean
+  title?: string
+  message: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+</script>
 <template>
-  <div
+  <div  v-if="show"
     class="flex w-full border-l-6 border-[#F87171] bg-[#F87171] bg-opacity-[15%] px-7 py-8 shadow-md dark:bg-[#1B1B24] dark:bg-opacity-30 md:p-9"
   >
     <div
@@ -20,12 +31,12 @@
       </svg>
     </div>
     <div class="w-full">
-      <h5 class="mb-3 font-bold text-[#B45454]">There were 1 errors with your submission</h5>
-      <ul>
+      <h5 class="mb-3 font-bold text-[#B45454]">{{message}}</h5>
+      <!-- <ul>
         <li class="leading-relaxed text-[#CD5D5D]">
           Lorem Ipsum is simply dummy text of the printing
         </li>
-      </ul>
+      </ul> -->
     </div>
   </div>
 </template>

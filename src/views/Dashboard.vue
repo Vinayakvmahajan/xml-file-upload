@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { saveRegistrationBulk } from '@/service/xmlUploadService'
+import { saveRegistrationBulk } from '@/service/registrationService'
+import  ConfirmModel  from '@/components/Popup/ConfirmModel.vue'
 import { ref, computed } from 'vue'
 import * as XLSX from 'xlsx'
+import AlertError from '@/components/Alerts/AlertError.vue'
 
 /* ===================== CONSTANTS ===================== */
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -28,6 +30,10 @@ const showPreview = ref(false)
 const previewColumns = ref<string[]>([])
 const previewRows = ref<any[]>([])
 const columnMapping = ref<Record<string, string>>({})
+
+const showConfirmModal = ref(false)
+const errorAlertMessage = ref('')
+
 
 /* Cell-level errors: "rowIndex-columnName" -> message */
 const cellErrors = ref<Record<string, string>>({})
@@ -124,6 +130,35 @@ const parseDOB = (value: string): string | null => {
   return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
 }
 
+const validateColumnMapping = () => {
+  errorAlertMessage.value = ''
+
+  const mappedTargets = Object.values(columnMapping.value).filter(v => v)
+
+  /* Check mandatory mappings */
+  const missing = expectedColumns.filter(
+    col => !mappedTargets.includes(col)
+  )
+
+  if (missing.length) {
+    errorAlertMessage.value = `Missing column mapping for: ${missing.join(', ')}`
+    return false
+  }
+
+  /* Check duplicate mapping */
+  const duplicates = mappedTargets.filter(
+    (v, i, arr) => arr.indexOf(v) !== i
+  )
+
+  if (duplicates.length) {
+    errorAlertMessage.value = `Duplicate column mapping detected: ${[...new Set(duplicates)].join(', ')}`
+    return false
+  }
+
+  return true
+}
+
+
 /* ===================== VALIDATION ===================== */
 const validateAll = () => {
   cellErrors.value = {}
@@ -204,72 +239,69 @@ const deleteRow = (i: number) => {
 
 /* ===================== FINAL SUBMIT ===================== */
 const finalUpload = async () => {
-  validateAll()
-
-  if (hasErrors.value) {
-    alert('Please fix highlighted errors before submitting.')
+  errorAlertMessage.value = ''
+  if (!validateColumnMapping()) {
+    alert('Please fix column mapping errors.')
     return
   }
 
-  if (!confirm('All records valid. Proceed to save?')) return
+  validateAll()
 
-  const payload = previewRows.value.map(row => {
-    const obj: any = {}
-    Object.entries(columnMapping.value).forEach(([src, tgt]) => {
-      obj[tgt] = row[src]
-    })
-    return obj
-  })
+  if (hasErrors.value) {
+    errorAlertMessage.value = 'Please fix highlighted errors before submitting.'
+    return
+  }
 
-  console.log('Before FINAL PAYLOAD:', payload)
+  showConfirmModal.value = true
+}
 
+const submitToServer = async () => {
   try {
     loading.value = true
+    errorAlertMessage.value = ''
+    const payload = previewRows.value.map(row => {
+      const obj: any = {}
+      Object.entries(columnMapping.value).forEach(([src, tgt]) => {
+        obj[tgt] = row[src]
+      })
+      return obj
+    })
+    const requestPayload = payload.map(row => ({
+      name: String(row['Name'] ?? '').trim(),
+      dob: String(row['Date of Birth'] ?? ''),
+      gender: String(row['Gender'] ?? '').trim(),
+      rank: row['Rank'] ? Number(row['Rank']) : null,
+      armynumber: String(row['Army No'] ?? '').trim(),
+      unit: row['Unit Name'] ? Number(row['Unit Name']) : null,
+      company: row['COY / Batch Name'] ? Number(row['COY / Batch Name']) : null,
+      soldiertype: String(row['Soldier Type'] ?? '').trim(),
+      posting: 'POSTED',
+      chestnumber: String(row['RFID Chest No'] ?? '').trim(),
+      coyBatchName: String(row['COY / Batch Name'] ?? '').trim(),
+      active: true
+    }))
 
-   const requestPayload = payload.map(row => ({
-    name: String(row['Name'] ?? '').trim(),
-    dob: String(row['Date of Birth'] ?? ''),
-    gender: String(row['Gender'] ?? '').trim(),
-    rank: row['Rank'] !== '' && row['Rank'] !== null
-      ? Number(row['Rank'])
-      : null,
-    armynumber: String(row['Army No'] ?? '').trim(),
-    unit: row['Unit Name'] !== '' && row['Unit Name'] !== null
-      ? Number(row['Unit Name'])
-      : null,
-    company: row['COY / Batch Name'] !== '' && row['COY / Batch Name'] !== null
-      ? Number(row['COY / Batch Name'])
-      : null,
-    soldiertype: String(row['Soldier Type'] ?? '').trim(),
-    posting: 'POSTED',
-    chestnumber: String(row['RFID Chest No'] ?? '').trim(),
-    coyBatchName: String(row['COY / Batch Name'] ?? '').trim(),
-    active: true
-  }))
+    console.log('Payload to submit:', requestPayload)
 
-   console.log('After FINAL PAYLOAD:', requestPayload)
+    const response = await saveRegistrationBulk(requestPayload)
 
-   const response = await saveRegistrationBulk(requestPayload)
-   console.log('FINAL RESPONSE:', response)
-    if(response){
-      alert('Records saved successfully.')
-      // Reset state
+    if (response) {
       selectedFile.value = null
       previewRows.value = []
       previewColumns.value = []
       showPreview.value = false
       columnMapping.value = {}
     } else {
-      alert('Error saving records.')
+      errorAlertMessage.value = 'Error while registration Please try again !';
     }
-    
-
-  } catch (err) {
-    alert('Server error while saving')
+  } catch {
+    errorAlertMessage.value = 'Error while registration Please try again !';
   } finally {
     loading.value = false
+    showConfirmModal.value = false
   }
 }
+
 </script>
 
 <template>
@@ -308,6 +340,13 @@ const finalUpload = async () => {
         {{ loading ? 'Processing...' : 'Upload Excel' }}
       </button>
     </div>
+
+    <AlertError
+      :show="errorAlertMessage !== ''"
+      :message = "errorAlertMessage"
+    />
+
+    
 
     <!-- PREVIEW -->
     <div v-if="showPreview" class="mt-6 overflow-auto">
@@ -371,4 +410,13 @@ const finalUpload = async () => {
       </button>
     </div>
   </div>
+
+  <ConfirmModel
+  :show="showConfirmModal"
+  title="Confirm Upload"
+  message="All records are valid. Do you want to proceed with saving?"
+  :loading="loading"
+  @confirm="submitToServer"
+  @cancel="showConfirmModal = false"
+/>
 </template>
