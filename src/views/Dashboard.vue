@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { saveRegistrationBulk } from '@/service/registrationService'
-import  ConfirmModel  from '@/components/Popup/ConfirmModel.vue'
+import ConfirmModel from '@/components/Popup/ConfirmModel.vue'
 import { ref, computed } from 'vue'
 import * as XLSX from 'xlsx'
 import AlertError from '@/components/Alerts/AlertError.vue'
+import { normalizeToMaxColumns, removeDecorativeMergedRows, removeFirstAndEmptyColumns, removeTrailingEmptyRows } from '@/utils/excelUtil'
 
 /* ===================== CONSTANTS ===================== */
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -34,6 +35,10 @@ const columnMapping = ref<Record<string, string>>({})
 const showConfirmModal = ref(false)
 const errorAlertMessage = ref('')
 
+const bulkBatchName = ref('')
+const bulkUnitName = ref('')
+const bulkSoldierType = ref('')
+
 
 /* Cell-level errors: "rowIndex-columnName" -> message */
 const cellErrors = ref<Record<string, string>>({})
@@ -45,6 +50,7 @@ const handleFileChange = (e: Event) => {
 }
 
 const handleDrop = (e: DragEvent) => {
+  reset();
   e.preventDefault()
   validateAndSetFile(e.dataTransfer?.files[0])
 }
@@ -77,6 +83,10 @@ const uploadFile = async () => {
     return
   }
 
+  const file = selectedFile.value
+  reset()
+  selectedFile.value = file
+
   loading.value = true
   try {
     const buffer = await selectedFile.value.arrayBuffer()
@@ -90,12 +100,41 @@ const uploadFile = async () => {
   }
 }
 
+
+
 const parseExcel = (buffer: ArrayBuffer) => {
   const workbook = XLSX.read(buffer, { type: 'array' })
-  const sheet = workbook.Sheets[workbook.SheetNames[0]]
-  const json = XLSX.utils.sheet_to_json<any>(sheet, { defval: '' })
+  const sheetName = workbook.SheetNames[0]
 
-  if (!json.length) throw new Error('Empty Excel')
+  let sheet = workbook.Sheets[sheetName]
+
+  // Remove merged rows only
+  sheet = removeDecorativeMergedRows(sheet)
+
+  let json = XLSX.utils.sheet_to_json<any>(sheet, {
+    defval: '',
+    blankrows: false,
+    raw: false
+  })
+
+  if (!json.length) {
+    errorAlertMessage.value = 'No usable data after removing merged title rows'
+    return
+  }
+
+  // Remove first row and empty columns
+  json = removeFirstAndEmptyColumns(json)
+
+  // Remove trailing empty rows
+  json = removeTrailingEmptyRows(json)
+
+  json = normalizeToMaxColumns(json, 10)
+
+
+  if (!json.length || !Object.keys(json[0]).length) {
+    errorAlertMessage.value = 'No usable columns after cleaning'
+    return
+  }
 
   previewColumns.value = Object.keys(json[0])
   previewRows.value = json
@@ -105,6 +144,8 @@ const parseExcel = (buffer: ArrayBuffer) => {
     columnMapping.value[col] = col
   })
 }
+
+
 
 /* ===================== DOB HANDLING ===================== */
 const parseDOB = (value: string): string | null => {
@@ -172,11 +213,17 @@ const validateAll = () => {
 
       /* Mandatory */
       if (
-        ['Army No', 'Date of Birth', 'Gender', 'RFID Chest No', 'Soldier Type']
+        ['Army No', 'Rank', 'Name', 'Date of Birth', 'Gender', 'RFID Chest No']
           .includes(target) && !val
       ) {
         cellErrors.value[key] = 'Mandatory field'
         return
+      }
+
+      if (target === 'Name' || target === 'Rank') {
+        if (!/^[A-Za-z\s]+$/.test(val)) {
+          cellErrors.value[key] = 'Text only (letters and spaces)'
+        }
       }
 
       /* Army No */
@@ -201,20 +248,27 @@ const validateAll = () => {
       if (target === 'Gender' && !['Male', 'Female'].includes(val))
         cellErrors.value[key] = 'Male / Female only'
 
-      /* Soldier Type */
-      // if (
-      //   target === 'Soldier Type' &&
-      //   !['Agniveer', 'Trained Soldier'].includes(val)
-      // )
-      //   cellErrors.value[key] = 'Invalid Soldier Type'
+      if(bulkBatchName.value || target === 'COY / Batch Name'){
+        if (target === 'COY / Batch Name' && bulkBatchName.value === '' && val === '') {
+          cellErrors.value[key] = 'Mandatory field'
+          errorAlertMessage.value = 'Please provide Bulk COY / Batch Name or fill individual rows.'
+        }
+      }
 
-      /* DOB */
-      // if (target === 'Date of Birth') {
-      //   const normalized = parseDOB(val)
-      //   if (!normalized)
-      //     cellErrors.value[key] = 'Invalid or ambiguous DOB'
-      //   else row[src] = normalized
-      // }
+      if(bulkUnitName.value || target === 'Unit Name'){
+        if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
+          cellErrors.value[key] = 'Mandatory field'
+          errorAlertMessage.value = 'Please provide Bulk Unit Name or fill individual rows.'
+        }
+      }
+
+       if(bulkUnitName.value || target === 'Unit Name'){
+        if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
+          cellErrors.value[key] = 'Mandatory field'
+          errorAlertMessage.value = 'Please provide Bulk Unit Name or fill individual rows.'
+        }
+      }
+
     })
   })
 }
@@ -241,7 +295,6 @@ const deleteRow = (i: number) => {
 const finalUpload = async () => {
   errorAlertMessage.value = ''
   if (!validateColumnMapping()) {
-    alert('Please fix column mapping errors.')
     return
   }
 
@@ -270,15 +323,12 @@ const submitToServer = async () => {
       name: String(row['Name'] ?? '').trim(),
       dob: String(row['Date of Birth'] ?? ''),
       gender: String(row['Gender'] ?? '').trim(),
-      rank: row['Rank'] ? Number(row['Rank']) : null,
-      armynumber: String(row['Army No'] ?? '').trim(),
-      unit: row['Unit Name'] ? Number(row['Unit Name']) : null,
-      company: row['COY / Batch Name'] ? Number(row['COY / Batch Name']) : null,
-      soldiertype: String(row['Soldier Type'] ?? '').trim(),
-      posting: 'POSTED',
-      chestnumber: String(row['RFID Chest No'] ?? '').trim(),
-      coyBatchName: String(row['COY / Batch Name'] ?? '').trim(),
-      active: true
+      rank: String(row['Rank'] ?? null),
+      armyNumber: String(row['Army No'] ?? '').trim(),
+      unit: String(row['Unit Name']) || String(bulkUnitName.value).trim(),
+      company: String(row['COY / Batch Name']) || String(bulkBatchName.value.trim()),
+      soldierType: String(row['Soldier Type']).trim() || String(bulkBatchName.value.trim()),
+      chestNumber: String(row['RFID Chest No'] ?? '').trim()
     }))
 
     console.log('Payload to submit:', requestPayload)
@@ -286,11 +336,7 @@ const submitToServer = async () => {
     const response = await saveRegistrationBulk(requestPayload)
 
     if (response) {
-      selectedFile.value = null
-      previewRows.value = []
-      previewColumns.value = []
-      showPreview.value = false
-      columnMapping.value = {}
+      reset();
     } else {
       errorAlertMessage.value = 'Error while registration Please try again !';
     }
@@ -302,6 +348,17 @@ const submitToServer = async () => {
   }
 }
 
+const reset = () => {
+  previewRows.value = []
+  previewColumns.value = []
+  columnMapping.value = {}
+  cellErrors.value = {}
+  errorAlertMessage.value = ''
+  success.value = ''
+  showPreview.value = false
+  error.value = ''
+}
+
 </script>
 
 <template>
@@ -309,14 +366,10 @@ const submitToServer = async () => {
     <h4 class="text-xl font-semibold mb-4">Upload Registration Screen</h4>
 
     <!-- Upload -->
-    <div
-      class="border border-dashed rounded p-6 text-center"
-      @dragover.prevent
-      @drop="handleDrop"
-    >
+    <div class="border border-dashed rounded p-6 text-center" @dragover.prevent @drop="handleDrop">
       <label class="cursor-pointer text-indigo-600 font-semibold">
-        Upload Excel File
-        <input type="file" class="sr-only" accept=".xls,.xlsx" @change="handleFileChange" />
+        Select Excel File
+        <input type="file" class="sr-only" accept=".xls,.xlsx"  @click="reset" @change="handleFileChange" />
       </label>
 
       <p class="text-sm text-gray-500 mt-2">
@@ -332,30 +385,50 @@ const submitToServer = async () => {
       <p v-if="error" class="text-red-600 mt-2">{{ error }}</p>
       <p v-if="success" class="text-green-600 mt-2">{{ success }}</p>
 
-      <button
-        class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded"
-        :disabled="loading"
-        @click="uploadFile"
-      >
+      <button class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded" :disabled="loading" @click="uploadFile">
         {{ loading ? 'Processing...' : 'Upload Excel' }}
       </button>
     </div>
 
-    <AlertError
-      :show="errorAlertMessage !== ''"
-      :message = "errorAlertMessage"
-    />
+    <AlertError :show="errorAlertMessage !== ''" :message="errorAlertMessage" />
 
-    
+
 
     <!-- PREVIEW -->
     <div v-if="showPreview" class="mt-6 overflow-auto">
+      <!-- BULK MAPPING INPUTS -->
+      <div class="max-w-4xl mx-auto p-4 mb-4 bg-gray-50 rounded-lg border grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Bulk COY / Batch Name</label>
+          <input v-model="bulkBatchName" type="text" placeholder="Enter Batch Name (applies to all rows)"
+            class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Bulk Unit Name</label>
+          <input v-model="bulkUnitName" type="text" placeholder="Enter Unit Name (applies to all rows)"
+            class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Soldier Type</label>
+          <select v-model="bulkSoldierType"
+            class="w-full px-3 py-2 border rounded bg-white focus:ring-2 focus:ring-indigo-500">
+            <option value="" disabled>Select Soldier Type</option>
+            <option value="AGNIVEER">Agniveer</option>
+            <option value="TRAINED">Trained Soldier</option>
+          </select>
+        </div>
+      </div>
+
+
       <table class="min-w-full border text-sm">
         <thead class="bg-gray-100">
           <tr>
+            <th>Serial No.</th>
             <th v-for="col in previewColumns" :key="col" class="border px-2 py-1">
               <div class="flex flex-col">
-                <span class="font-semibold">{{ col }}</span>
+                <!-- <span class="font-semibold">{{ col }}</span> -->
                 <select v-model="columnMapping[col]" class="border rounded text-xs">
                   <option value="">-- Map To --</option>
                   <option v-for="exp in expectedColumns" :key="exp" :value="exp">
@@ -370,22 +443,16 @@ const submitToServer = async () => {
 
         <tbody>
           <tr v-for="(row, i) in previewRows" :key="i">
+            <td class="border px-1 text-center">{{ i + 1 }}</td>
             <td v-for="col in previewColumns" :key="col" class="border px-1">
-            <div class="flex flex-col">
-              <input
-                v-model="previewRows[i][col]"
-                class="w-full border rounded px-1"
-                :class="{ 'border-red-500 bg-red-50': getCellError(i, col) }"
-                @blur="validateAll"
-              />
+              <div class="flex flex-col">
+                <input v-model="previewRows[i][col]" class="w-full border rounded px-1"
+                  :class="{ 'border-red-500 bg-red-50': getCellError(i, col) }" @blur="validateAll" />
 
-              <span
-                v-if="getCellError(i, col)"
-                class="text-xs text-red-600 mt-0.5"
-              >
-                {{ getCellError(i, col) }}
-              </span>
-            </div>
+                <span v-if="getCellError(i, col)" class="text-xs text-red-600 mt-0.5">
+                  {{ getCellError(i, col) }}
+                </span>
+              </div>
 
             </td>
             <td class="border text-center">
@@ -402,21 +469,13 @@ const submitToServer = async () => {
 
     <!-- FINAL -->
     <div v-if="showPreview" class="mt-6">
-      <button
-        class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-        @click="finalUpload"
-      >
+      <button class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" @click="finalUpload">
         Confirm & Final Upload
       </button>
     </div>
   </div>
 
-  <ConfirmModel
-  :show="showConfirmModal"
-  title="Confirm Upload"
-  message="All records are valid. Do you want to proceed with saving?"
-  :loading="loading"
-  @confirm="submitToServer"
-  @cancel="showConfirmModal = false"
-/>
+  <ConfirmModel :show="showConfirmModal" title="Confirm Upload"
+    message="All records are valid. Do you want to proceed with saving?" :loading="loading" @confirm="submitToServer"
+    @cancel="showConfirmModal = false" />
 </template>
