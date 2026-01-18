@@ -82,7 +82,7 @@ const removeFirstAndEmptyColumns = (rows: any[]): any[] => {
   const remainingKeys = keys.slice(1)
 
   // 2️⃣ Take EXACTLY first 10 columns (do NOT remove empty ones)
-  const firstTenKeys = remainingKeys.slice(0, 9)
+  const firstTenKeys = remainingKeys.slice(0, 10)
 
   // 3️⃣ Rebuild rows with those 10 columns only
   return rows.map(row => {
@@ -93,6 +93,7 @@ const removeFirstAndEmptyColumns = (rows: any[]): any[] => {
     return obj
   })
 }
+
 
 const normalizeToMaxColumns = (rows: any[], maxCols: number) => {
   if (!rows.length) return rows

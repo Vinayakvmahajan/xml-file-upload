@@ -4,6 +4,7 @@ defineProps<{
   title?: string
   message: string
   loading?: boolean
+  cancelButtonRequired?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 
       <div class="flex justify-end gap-3">
         <button
+          v-if="cancelButtonRequired"
           class="px-4 py-2 rounded border text-gray-700 hover:bg-gray-100"
           @click="$emit('cancel')"
           :disabled="loading"
@@ -40,7 +42,7 @@ const emit = defineEmits<{
           @click="$emit('confirm')"
           :disabled="loading"
         >
-          {{ loading ? 'Please wait...' : 'OK' }}
+          Ok
         </button>
       </div>
     </div>

@@ -39,6 +39,10 @@ const bulkBatchName = ref('')
 const bulkUnitName = ref('')
 const bulkSoldierType = ref('')
 
+const popUpMsg = ref('All records are valid. Do you want to proceed with saving?')
+const isValidated = ref(false)
+const stage = ref<'idle' | 'validating' | 'submitting'>('idle')
+
 
 /* Cell-level errors: "rowIndex-columnName" -> message */
 const cellErrors = ref<Record<string, string>>({})
@@ -128,7 +132,7 @@ const parseExcel = (buffer: ArrayBuffer) => {
   // Remove trailing empty rows
   json = removeTrailingEmptyRows(json)
 
-  json = normalizeToMaxColumns(json, 10)
+  json = normalizeToMaxColumns(json, 9)
 
 
   if (!json.length || !Object.keys(json[0]).length) {
@@ -147,29 +151,7 @@ const parseExcel = (buffer: ArrayBuffer) => {
 
 
 
-/* ===================== DOB HANDLING ===================== */
-const parseDOB = (value: string): string | null => {
-  if (!value) return null
 
-  const cleaned = value.replace(/[._-]/g, '/')
-  const parts = cleaned.split('/')
-
-  if (parts.length !== 3) return null
-
-  let [dd, mm, yy] = parts.map(Number)
-  if (!dd || !mm || !yy) return null
-
-  if (yy < 100) yy += 2000
-
-  const date = new Date(yy, mm - 1, dd)
-  if (
-    date.getFullYear() !== yy ||
-    date.getMonth() !== mm - 1 ||
-    date.getDate() !== dd
-  ) return null
-
-  return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
-}
 
 const validateColumnMapping = () => {
   errorAlertMessage.value = ''
@@ -182,7 +164,8 @@ const validateColumnMapping = () => {
   )
 
   if (missing.length) {
-    errorAlertMessage.value = `Missing column mapping for: ${missing.join(', ')}`
+    popUpMsg.value = `Missing column mapping for: ${missing.join(', ')}`
+    showConfirmModal.value = true
     return false
   }
 
@@ -192,16 +175,34 @@ const validateColumnMapping = () => {
   )
 
   if (duplicates.length) {
-    errorAlertMessage.value = `Duplicate column mapping detected: ${[...new Set(duplicates)].join(', ')}`
+    popUpMsg.value = `Duplicate column mapping detected: ${[...new Set(duplicates)].join(', ')}`
+    showConfirmModal.value = true
     return false
   }
 
   return true
 }
 
+const isColumnMappingValid = computed(() => {
+  const mappedTargets = Object.values(columnMapping.value).filter(Boolean)
+
+  // mandatory columns present
+  const missing = expectedColumns.filter(
+    col => !mappedTargets.includes(col)
+  )
+
+  if (missing.length) return false
+
+  // no duplicates
+  const unique = new Set(mappedTargets)
+  if (unique.size !== mappedTargets.length) return false
+
+  return true
+})
 
 /* ===================== VALIDATION ===================== */
 const validateAll = () => {
+  stage.value = 'validating'
   cellErrors.value = {}
   const armySet = new Set<string>()
   const rfidSet = new Set<string>()
@@ -251,27 +252,56 @@ const validateAll = () => {
       if(bulkBatchName.value || target === 'COY / Batch Name'){
         if (target === 'COY / Batch Name' && bulkBatchName.value === '' && val === '') {
           cellErrors.value[key] = 'Mandatory field'
-          errorAlertMessage.value = 'Please provide Bulk COY / Batch Name or fill individual rows.'
+          popUpMsg.value = 'Please provide Bulk COY / Batch Name or fill individual rows.'
+          showConfirmModal.value = true
         }
       }
 
       if(bulkUnitName.value || target === 'Unit Name'){
         if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
           cellErrors.value[key] = 'Mandatory field'
-          errorAlertMessage.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          popUpMsg.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          showConfirmModal.value = true
         }
       }
 
        if(bulkUnitName.value || target === 'Unit Name'){
         if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
           cellErrors.value[key] = 'Mandatory field'
-          errorAlertMessage.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          popUpMsg.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          showConfirmModal.value = true
         }
       }
 
     })
   })
+
+
+
 }
+
+const validateData = () => {
+  stage.value = 'validating'
+  isValidated.value = false
+
+  validateAll()
+
+  if (!validateColumnMapping()) {
+    stage.value = 'idle'
+    return
+  }
+
+  if (hasErrors.value) {
+    popUpMsg.value = 'Please fix highlighted errors before submitting.'
+    showConfirmModal.value = true
+    stage.value = 'idle'
+    return
+  }
+
+  isValidated.value = true
+  stage.value = 'idle'
+}
+
 
 const getCellError = (rowIndex: number, col: string) => {
   return cellErrors.value[`${rowIndex}-${col}`] || ''
@@ -279,6 +309,14 @@ const getCellError = (rowIndex: number, col: string) => {
 
 
 const hasErrors = computed(() => Object.keys(cellErrors.value).length > 0)
+
+const canProceed = computed(() => {
+  return (
+    isValidated.value &&
+    !hasErrors.value &&
+    isColumnMappingValid.value
+  )
+})
 
 /* ===================== ROW ACTIONS ===================== */
 const addRow = () => {
@@ -293,24 +331,26 @@ const deleteRow = (i: number) => {
 
 /* ===================== FINAL SUBMIT ===================== */
 const finalUpload = async () => {
-  errorAlertMessage.value = ''
-  if (!validateColumnMapping()) {
-    return
-  }
-
-  validateAll()
-
-  if (hasErrors.value) {
-    errorAlertMessage.value = 'Please fix highlighted errors before submitting.'
-    return
-  }
-
+  stage.value = 'submitting'
+  popUpMsg.value = isValidated.value ? 'All records are valid. Do you want to proceed with saving?' : 'Data is not validated yet. Do you want to proceed anyway?'
   showConfirmModal.value = true
 }
 
+const confirm = () => {
+  showConfirmModal.value = false
+  if(stage.value === 'submitting' && isValidated.value){
+    submitToServer()
+  }
+}
+
 const submitToServer = async () => {
+  if(!isValidated.value ){
+    showConfirmModal.value = false
+    return
+  }
   try {
     loading.value = true
+    showConfirmModal.value = false
     errorAlertMessage.value = ''
     const payload = previewRows.value.map(row => {
       const obj: any = {}
@@ -328,7 +368,7 @@ const submitToServer = async () => {
       unit: String(row['Unit Name']) || String(bulkUnitName.value).trim(),
       company: String(row['COY / Batch Name']) || String(bulkBatchName.value.trim()),
       soldierType: String(row['Soldier Type']).trim() || String(bulkBatchName.value.trim()),
-      chestNumber: String(row['RFID Chest No'] ?? '').trim()
+      chestNumber: Number(row['RFID Chest No'] ?? null)
     }))
 
     console.log('Payload to submit:', requestPayload)
@@ -338,15 +378,23 @@ const submitToServer = async () => {
     if (response) {
       reset();
     } else {
-      errorAlertMessage.value = 'Error while registration Please try again !';
+      isError()
     }
   } catch {
-    errorAlertMessage.value = 'Error while registration Please try again !';
+    isError()
   } finally {
     loading.value = false
     showConfirmModal.value = false
+    isValidated.value = false;
   }
 }
+
+  const isError = () => {
+      stage.value = 'idle'
+      popUpMsg.value = 'Error while registration Please try again !'
+      showConfirmModal.value = true
+      isValidated.value = false;
+  }
 
 const reset = () => {
   previewRows.value = []
@@ -430,7 +478,8 @@ const reset = () => {
               <div class="flex flex-col">
                 <!-- <span class="font-semibold">{{ col }}</span> -->
                 <select v-model="columnMapping[col]" class="border rounded text-xs">
-                  <option value="">-- Map To --</option>
+                  <option disabled value="">-- Select --</option>
+
                   <option v-for="exp in expectedColumns" :key="exp" :value="exp">
                     {{ exp }}
                   </option>
@@ -469,13 +518,21 @@ const reset = () => {
 
     <!-- FINAL -->
     <div v-if="showPreview" class="mt-6">
-      <button class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" @click="finalUpload">
-        Confirm & Final Upload
-      </button>
+      <div class="flex gap-4">
+        <button class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" @click="validateData">
+          Verify
+        </button>
+        <button class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" :disabled="!canProceed" @click="finalUpload">
+          Save
+        </button>
+        <button class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" :disabled="!canProceed">
+          Download Excel
+        </button>
+      </div>
     </div>
   </div>
 
-  <ConfirmModel :show="showConfirmModal" title="Confirm Upload"
-    message="All records are valid. Do you want to proceed with saving?" :loading="loading" @confirm="submitToServer"
+  <ConfirmModel :show="showConfirmModal" :cancelButtonRequired="stage == 'submitting'" :title="'Confirm'"
+    :message="popUpMsg" :loading="loading" @confirm="confirm"
     @cancel="showConfirmModal = false" />
 </template>
