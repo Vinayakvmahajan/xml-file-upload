@@ -236,14 +236,6 @@ const validateAll = () => {
         armySet.add(val)
       }
 
-      /* RFID */
-      if (target === 'RFID Chest No') {
-        if (!/^\d+$/.test(val))
-          cellErrors.value[key] = 'Numeric only'
-        if (rfidSet.has(val))
-          cellErrors.value[key] = 'Duplicate RFID'
-        rfidSet.add(val)
-      }
 
       /* Gender */
       if (target === 'Gender' && !['Male', 'Female'].includes(val))
@@ -368,20 +360,21 @@ const submitToServer = async () => {
       unit: String(row['Unit Name']) || String(bulkUnitName.value).trim(),
       company: String(row['COY / Batch Name']) || String(bulkBatchName.value.trim()),
       soldierType: String(row['Soldier Type']).trim() || String(bulkBatchName.value.trim()),
-      chestNumber: Number(row['RFID Chest No'] ?? null)
+      chestNumber: String(row['RFID Chest No'] ?? '').trim(),
     }))
 
     console.log('Payload to submit:', requestPayload)
 
     const response = await saveRegistrationBulk(requestPayload)
-
-    if (response) {
+    console.log('Server response:', response)
+    if (response?.data?.infoMessage && response.data.infoMessage !== '') {
       reset();
     } else {
-      isError()
+      isError(response.data)
     }
-  } catch {
-    isError()
+  } catch (error: any) {
+    console.error('Server error response:', error.response)
+    isError(error.response.data)
   } finally {
     loading.value = false
     showConfirmModal.value = false
@@ -389,12 +382,18 @@ const submitToServer = async () => {
   }
 }
 
-  const isError = () => {
-      stage.value = 'idle'
-      popUpMsg.value = 'Error while registration Please try again !'
-      showConfirmModal.value = true
-      isValidated.value = false;
+const isError = (error: any) => {
+  if (error) {
+    const chestNumber = error.chestNumber || '';
+    const armyNumber = error.armyNumber || '';
+    errorAlertMessage.value = `Error: ${error.errorMessage} ${chestNumber ? `(RFID Chest No: ${chestNumber})` : ''} ${armyNumber ? `(Army No: ${armyNumber})` : ''}`;
   }
+
+  stage.value = 'idle'
+  popUpMsg.value = 'Error while registration Please try again !'
+  showConfirmModal.value = true
+  isValidated.value = false;
+}
 
 const reset = () => {
   previewRows.value = []
