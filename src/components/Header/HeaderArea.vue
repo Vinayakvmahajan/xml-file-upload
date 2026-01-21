@@ -12,7 +12,7 @@ const sidebarStore = useSidebarStore()
     <div class="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
       <div class="flex items-center gap-2 sm:gap-4 lg:hidden">
         <!-- Hamburger Toggle BTN -->
-        <button
+        <!-- <button
           class="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-boxdark lg:hidden"
           @click="
             () => {
@@ -47,11 +47,11 @@ const sidebarStore = useSidebarStore()
               ></span>
             </span>
           </span>
-        </button>
+        </button> -->
         <!-- Hamburger Toggle BTN -->
-        <router-link class="block flex-shrink-0 lg:hidden" to="/">
+        <!-- <router-link class="block flex-shrink-0 lg:hidden" to="/">
           <img src="@/assets/images/logo/logo-icon.svg" alt="Logo" />
-        </router-link>
+        </router-link> -->
       </div>
       <!-- <div class="hidden sm:block">
         <form action="https://formbold.com/s/unique_form_id" method="POST">
@@ -100,6 +100,9 @@ const sidebarStore = useSidebarStore()
           </li>
           <li>
             <router-link to="/data" class="text-lg font-bold">Data</router-link>
+          </li>
+          <li>
+            <router-link to="/select-database" class="text-lg font-bold">Select-DB</router-link>
           </li>
           
           <!-- Notification Menu Area -->

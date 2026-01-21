@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import TablesView from '@/views/TablesView.vue'
 import Dashboard from '@/views/Dashboard.vue'
+import SelectDatabase from '@/views/SelectDatabase.vue'
+
 
 const routes = [
   {
@@ -17,6 +19,14 @@ const routes = [
     component: TablesView,
     meta: {
       title: 'Data'
+    }
+  },
+  {
+    path: '/select-database',
+    name: 'select-database',
+    component: SelectDatabase,
+    meta: {
+      title: 'Select Database'
     }
   }
 ]

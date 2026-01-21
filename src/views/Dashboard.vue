@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saveRegistrationBulk } from '@/service/registrationService'
 import ConfirmModel from '@/components/Popup/ConfirmModel.vue'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import * as XLSX from 'xlsx'
 import AlertError from '@/components/Alerts/AlertError.vue'
 import { normalizeToMaxColumns, removeDecorativeMergedRows, removeFirstAndEmptyColumns, removeTrailingEmptyRows } from '@/utils/excelUtil'
@@ -200,6 +200,36 @@ const isColumnMappingValid = computed(() => {
   return true
 })
 
+watch(bulkBatchName, (val) => {
+  if (!val && val !== '') return
+  mapBulkValuesToRows('COY / Batch Name', val)
+})
+
+watch(bulkUnitName, (val) => {
+  if (!val && val !== '') return
+  mapBulkValuesToRows('Unit Name', val)
+})
+
+watch(bulkSoldierType, (val) => {
+  if (!val && val !== '') return
+  mapBulkValuesToRows('Soldier Type', val)
+})
+
+
+const mapBulkValuesToRows = (target: string, val: string) => {
+
+  previewRows.value.forEach(row => {
+    console.log('Before bulk mapping:', row)
+    console.log(!row[target] , 'target:', target, 'val:', val);
+    if (row[target]) {
+      row[target] = val
+    }
+  })
+}
+
+
+
+
 /* ===================== VALIDATION ===================== */
 const validateAll = () => {
   stage.value = 'validating'
@@ -236,32 +266,53 @@ const validateAll = () => {
         armySet.add(val)
       }
 
+      /* Date of Birth */
+      const DOB_REGEX = /^((0[1-9]|[12][0-9]|3[01])([\/._-])(0[1-9]|1[0-2])\3(\d{4}|\d{2})|(0?[1-9]|1[0-2])([\/._-])(0[1-9]|[12][0-9]|3[01])\7\d{2})$/
+
+
+
+      if (target === 'Date of Birth') {
+        if (!DOB_REGEX.test(val)) {
+          cellErrors.value[key] =
+            'Invalid DOB format. Allowed: DD/MM/YYYY, DD.MM.YY, DD-MM-YY, DD_MM_YY ,MM/DD/YY'
+        }
+      }
 
       /* Gender */
       if (target === 'Gender' && !['Male', 'Female'].includes(val))
         cellErrors.value[key] = 'Male / Female only'
 
-      if(bulkBatchName.value || target === 'COY / Batch Name'){
-        if (target === 'COY / Batch Name' && bulkBatchName.value === '' && val === '') {
+
+      if (target === 'COY / Batch Name') {
+        if (!bulkBatchName.value && !val) {
           cellErrors.value[key] = 'Mandatory field'
-          popUpMsg.value = 'Please provide Bulk COY / Batch Name or fill individual rows.'
+          popUpMsg.value =
+            'Please provide Bulk COY / Batch Name or fill individual rows.'
           showConfirmModal.value = true
+        } else if(bulkBatchName.value) {
+          mapBulkValuesToRows('COY / Batch Name', bulkBatchName.value)
         }
       }
 
-      if(bulkUnitName.value || target === 'Unit Name'){
-        if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
+      if (target === 'Unit Name') {
+        if (!bulkUnitName.value && !val) {
           cellErrors.value[key] = 'Mandatory field'
-          popUpMsg.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          popUpMsg.value =
+            'Please provide Bulk Unit Name or fill individual rows.'
           showConfirmModal.value = true
+        } else if(bulkUnitName.value) {
+          mapBulkValuesToRows('Unit Name', bulkUnitName.value)
         }
       }
 
-       if(bulkUnitName.value || target === 'Unit Name'){
-        if (target === 'Unit Name' && bulkUnitName.value === '' && val === '') {
+      if (target === 'Soldier Type') {
+        if (!bulkSoldierType.value && !val) {
           cellErrors.value[key] = 'Mandatory field'
-          popUpMsg.value = 'Please provide Bulk Unit Name or fill individual rows.'
+          popUpMsg.value =
+            'Please provide Bulk Soldier Type or fill individual rows.'
           showConfirmModal.value = true
+        } else if(bulkSoldierType.value) {
+          mapBulkValuesToRows('Soldier Type', bulkSoldierType.value)
         }
       }
 
@@ -353,13 +404,13 @@ const submitToServer = async () => {
     })
     const requestPayload = payload.map(row => ({
       name: String(row['Name'] ?? '').trim(),
-      dob: String(row['Date of Birth'] ?? ''),
+      dob: String(row['Date of Birth'] ?? '').trim(),
       gender: String(row['Gender'] ?? '').trim(),
-      rank: String(row['Rank'] ?? null),
+      rank: String(row['Rank'] ?? '').trim(),
       armyNumber: String(row['Army No'] ?? '').trim(),
       unit: String(row['Unit Name']) || String(bulkUnitName.value).trim(),
       company: String(row['COY / Batch Name']) || String(bulkBatchName.value.trim()),
-      soldierType: String(row['Soldier Type']).trim() || String(bulkBatchName.value.trim()),
+      soldierType: String(row['Soldier Type']).trim() || String(bulkSoldierType.value.trim()),
       chestNumber: String(row['RFID Chest No'] ?? '').trim(),
     }))
 
@@ -368,13 +419,19 @@ const submitToServer = async () => {
     const response = await saveRegistrationBulk(requestPayload)
     console.log('Server response:', response)
     if (response?.data?.infoMessage && response.data.infoMessage !== '') {
+      stage.value = 'idle'
+      popUpMsg.value = response.data.infoMessage
+      showConfirmModal.value = true
       reset();
+      scrollToTop();
     } else {
       isError(response.data)
+      scrollToTop()
     }
   } catch (error: any) {
     console.error('Server error response:', error.response)
     isError(error.response.data)
+    scrollToTop();
   } finally {
     loading.value = false
     showConfirmModal.value = false
@@ -404,6 +461,13 @@ const reset = () => {
   success.value = ''
   showPreview.value = false
   error.value = ''
+}
+
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
 }
 
 </script>
