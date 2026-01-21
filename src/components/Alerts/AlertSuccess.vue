@@ -1,5 +1,5 @@
 <template>
-  <div
+  <div v-if="show"
     class="flex w-full border-l-6 border-[#34D399] bg-[#34D399] bg-opacity-[15%] px-7 py-8 shadow-md dark:bg-[#1B1B24] dark:bg-opacity-30 md:p-9"
   >
     <div
@@ -20,12 +20,21 @@
       </svg>
     </div>
     <div class="w-full">
-      <h5 class="mb-3 text-lg font-bold text-black dark:text-[#34D399]">
-        Message Sent Successfully
-      </h5>
-      <p class="text-base leading-relaxed text-body">
-        Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-      </p>
+       <h5 class="mb-3 font-bold text-[#B45454]">{{message}}</h5>
+     
+    
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+defineProps<{
+  show: boolean
+  title?: string
+  message: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+</script>

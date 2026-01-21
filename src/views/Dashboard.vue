@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { saveRegistrationBulk } from '@/service/registrationService'
 import ConfirmModel from '@/components/Popup/ConfirmModel.vue'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import * as XLSX from 'xlsx'
 import AlertError from '@/components/Alerts/AlertError.vue'
 import { normalizeToMaxColumns, removeDecorativeMergedRows, removeFirstAndEmptyColumns, removeTrailingEmptyRows } from '@/utils/excelUtil'
+import AlertSuccess from '@/components/Alerts/AlertSuccess.vue'
 
 /* ===================== CONSTANTS ===================== */
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -34,6 +35,7 @@ const columnMapping = ref<Record<string, string>>({})
 
 const showConfirmModal = ref(false)
 const errorAlertMessage = ref('')
+const successAlertMessage = ref('')
 
 const bulkBatchName = ref('')
 const bulkUnitName = ref('')
@@ -267,14 +269,13 @@ const validateAll = () => {
       }
 
       /* Date of Birth */
-      const DOB_REGEX = /^((0[1-9]|[12][0-9]|3[01])([\/._-])(0[1-9]|1[0-2])\3(\d{4}|\d{2})|(0?[1-9]|1[0-2])([\/._-])(0[1-9]|[12][0-9]|3[01])\7\d{2})$/
-
+     const DOB_REGEX = /^((0[1-9]|[12][0-9]|3[01])([\/._-])(0[1-9]|1[0-2])\3(\d{4}|\d{2})|(0?[1-9]|1[0-2])([\/._-])(0?[1-9]|[12][0-9]|3[01])\7\d{2})$/
 
 
       if (target === 'Date of Birth') {
         if (!DOB_REGEX.test(val)) {
           cellErrors.value[key] =
-            'Invalid DOB format. Allowed: DD/MM/YYYY, DD.MM.YY, DD-MM-YY, DD_MM_YY ,MM/DD/YY'
+            'Invalid DOB format. Allowed: DD/MM/YYYY, DD.MM.YY, DD-MM-YY, DD_MM_YY ,MM/DD/YY ,M/D/YY'
         }
       }
 
@@ -318,9 +319,6 @@ const validateAll = () => {
 
     })
   })
-
-
-
 }
 
 const validateData = () => {
@@ -417,21 +415,21 @@ const submitToServer = async () => {
     console.log('Payload to submit:', requestPayload)
 
     const response = await saveRegistrationBulk(requestPayload)
-    console.log('Server response:', response)
-    if (response?.data?.infoMessage && response.data.infoMessage !== '') {
+    console.log('Server response:', response.data)
+    if (response?.infoMessage && response.infoMessage !== '') {
       stage.value = 'idle'
-      popUpMsg.value = response.data.infoMessage
-      showConfirmModal.value = true
+      successAlertMessage.value = response.infoMessage
+      setTimeout(() => {
+        successAlertMessage.value = ''
+      }, 5000)
       reset();
-      scrollToTop();
     } else {
       isError(response.data)
-      scrollToTop()
     }
   } catch (error: any) {
-    console.error('Server error response:', error.response)
-    isError(error.response.data)
-    scrollToTop();
+    console.error('Server error response:', error.message)
+    error.errorMessage = error.message || 'Unknown error occurred'
+    isError(error)
   } finally {
     loading.value = false
     showConfirmModal.value = false
@@ -439,7 +437,7 @@ const submitToServer = async () => {
   }
 }
 
-const isError = (error: any) => {
+const isError = async (error: any) => {
   if (error) {
     const chestNumber = error.chestNumber || '';
     const armyNumber = error.armyNumber || '';
@@ -450,6 +448,8 @@ const isError = (error: any) => {
   popUpMsg.value = 'Error while registration Please try again !'
   showConfirmModal.value = true
   isValidated.value = false;
+
+  await scrollToTop()
 }
 
 const reset = () => {
@@ -463,16 +463,27 @@ const reset = () => {
   error.value = ''
 }
 
-const scrollToTop = () => {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  })
+const topAnchor = ref<HTMLElement | null>(null)
+const scrollToTop = async () => {
+  await nextTick()
+
+  // Delay ensures modal + DOM are settled
+  setTimeout(() => {
+    topAnchor.value?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }, 100)
 }
+
+
+
 
 </script>
 
 <template>
+  <div ref="topAnchor"></div>
+  <AlertSuccess :show="successAlertMessage !== ''" :message="successAlertMessage" />
   <div class="p-6 bg-white border rounded shadow">
     <h4 class="text-xl font-semibold mb-4">Upload Registration Screen</h4>
 
@@ -506,7 +517,7 @@ const scrollToTop = () => {
 
 
     <!-- PREVIEW -->
-    <div v-if="showPreview" class="mt-6 overflow-auto">
+    <div v-if="showPreview" ref="previewContainer" class="mt-6 overflow-auto">
       <!-- BULK MAPPING INPUTS -->
       <div class="max-w-4xl mx-auto p-4 mb-4 bg-gray-50 rounded-lg border grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>

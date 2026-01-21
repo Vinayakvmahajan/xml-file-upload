@@ -1,17 +1,16 @@
 <template>
   <AlertError :show="errorAlertMessage !== ''" :message="errorAlertMessage" />
+  <AlertSuccess :show="successAlertMessage !== ''" :message="successAlertMessage" />
+     <p v-if="loading" class="text-sm text-gray-500">
+      Loading databases...
+    </p>
   <div v-if="databases.length>0" class="p-6 bg-white border rounded shadow">
     <h4 class="text-lg font-semibold mb-4">
       Select Database(s)
     </h4>
 
-    <!-- Loading -->
-    <p v-if="loading" class="text-sm text-gray-500">
-      Loading databases...
-    </p>
-
     <!-- Database List -->
-    <div v-else class="space-y-2">
+    <div  class="space-y-2">
       <label
         v-for="db in databases"
         :key="db.name"
@@ -52,17 +51,19 @@
 import { ref, onMounted } from 'vue';
 import { getDatabaseConfigs, saveDatabaseConfigs } from '@/service/selectDatabaseService';
 import AlertError from '@/components/Alerts/AlertError.vue';
+import AlertSuccess from '@/components/Alerts/AlertSuccess.vue';
 
 
 
 /* state */
-const databases = ref<Array<{ name: string; value: string }>>([])
+const databases = ref<any>([])
 const loading = ref(false)
 const saving = ref(false)
 const success = ref(false)
 const error = ref<string | null>(null)
     
 const errorAlertMessage = ref('')
+const successAlertMessage = ref('')
 
 /* lifecycle */
 onMounted(() => {
@@ -77,7 +78,8 @@ const fetchDatabases = async () => {
 
   try {
     const res = await getDatabaseConfigs();
-    databases.value = res.data;
+    console.log('Fetched databases:', res);
+    databases.value = res || [];
   } catch (e) {
     errorAlertMessage.value = 'Failed to load databases';
   } finally {
@@ -95,6 +97,7 @@ const saveSelection = async () => {
     await saveDatabaseConfigs(databases.value);
 
     success.value = true;
+    successAlertMessage.value = 'Database selection saved successfully';
   } catch (e) {
     errorAlertMessage.value = 'Failed to save database selection';
   } finally {
@@ -109,7 +112,7 @@ const formatDbName = (name:string) => {
 const isSelected = (db:any) => db.value === "True"
 
 const toggleSelection = (db:any) => {
-  db.value = db.value === "True" ? "False" : "True"
+  db.value = db.value.trim() === "True" ? "False" : "True"
 }
 
 </script>
