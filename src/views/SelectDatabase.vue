@@ -37,10 +37,6 @@
       </button>
     </div>
 
-    <!-- Status -->
-    <p v-if="success" class="text-green-600 text-sm mt-2">
-      Database selection saved successfully
-    </p>
     <p v-if="error" class="text-red-600 text-sm mt-2">
       {{ error }}
     </p>
@@ -79,7 +75,9 @@ const fetchDatabases = async () => {
   try {
     const res = await getDatabaseConfigs();
     console.log('Fetched databases:', res);
-    databases.value = res || [];
+    databases.value = Array.isArray(res)
+  ? res.filter(val => typeof val?.name === 'string' && val.name.startsWith('DB_'))
+  : [];
   } catch (e) {
     errorAlertMessage.value = 'Failed to load databases';
   } finally {
@@ -98,8 +96,14 @@ const saveSelection = async () => {
 
     success.value = true;
     successAlertMessage.value = 'Database selection saved successfully';
+    setTimeout(() => {
+      successAlertMessage.value = ''
+    }, 5000)
   } catch (e) {
     errorAlertMessage.value = 'Failed to save database selection';
+    setTimeout(() => {
+      errorAlertMessage.value = ''
+    }, 5000)
   } finally {
     saving.value = false;
   }

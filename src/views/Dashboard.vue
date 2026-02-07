@@ -415,16 +415,16 @@ const submitToServer = async () => {
     console.log('Payload to submit:', requestPayload)
 
     const response = await saveRegistrationBulk(requestPayload)
-    console.log('Server response:', response.data)
+    console.log('Server response:', response)
     if (response?.infoMessage && response.infoMessage !== '') {
       stage.value = 'idle'
       successAlertMessage.value = response.infoMessage
       setTimeout(() => {
         successAlertMessage.value = ''
-      }, 5000)
+      }, 10000)
       reset();
     } else {
-      isError(response.data)
+      isError(response)
     }
   } catch (error: any) {
     console.error('Server error response:', error.message)
@@ -443,12 +443,8 @@ const isError = async (error: any) => {
     const armyNumber = error.armyNumber || '';
     errorAlertMessage.value = `Error: ${error.errorMessage} ${chestNumber ? `(RFID Chest No: ${chestNumber})` : ''} ${armyNumber ? `(Army No: ${armyNumber})` : ''}`;
   }
-
   stage.value = 'idle'
-  popUpMsg.value = 'Error while registration Please try again !'
-  showConfirmModal.value = true
   isValidated.value = false;
-
   await scrollToTop()
 }
 
@@ -461,6 +457,7 @@ const reset = () => {
   success.value = ''
   showPreview.value = false
   error.value = ''
+  selectedFile.value = null
 }
 
 const topAnchor = ref<HTMLElement | null>(null)

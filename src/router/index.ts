@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import TablesView from '@/views/TablesView.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import SelectDatabase from '@/views/SelectDatabase.vue'
+import RaceResult from '@/views/RaceResult.vue'
 
 
 const routes = [
@@ -16,7 +16,7 @@ const routes = [
   {
     path: '/data',
     name: 'data',
-    component: TablesView,
+    component: RaceResult,
     meta: {
       title: 'Data'
     }
