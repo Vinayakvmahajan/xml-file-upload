@@ -12,6 +12,7 @@ import DownloadReportModal from '@/components/Popup/DownloadReportModal.vue'
 /* ===================== STATE ===================== */
 const selectedDate = ref('')
 const loading = ref(false)
+const downloadLoading = ref(false)
 
 const errorAlertMessage = ref('')
 const successAlertMessage = ref('')
@@ -28,16 +29,17 @@ const availableColumns = [
   'Rank',
   'Name',
   'Age',
-  'RFID Chest No',
   'Gender',
+  'Soldier Type',
   'Coy/Batch Name',
   'Unit Name',
-  'Soldier Type',
+  'RFID Chest No',
+  'Race Type',
   'Start Time',
   'End Time',
-  'Total Run Time',
+  'Run Time',
   'Status',
-  'Race Type'
+  'Remark'
 ]
 
 const selectedColumns = ref<string[]>([
@@ -47,9 +49,9 @@ const selectedColumns = ref<string[]>([
   'Age',
   'Gender',
   'Coy/Batch Name',
-  'Total Run Time',
-  'RFID Chest No'
-
+  'Run Time',
+  'RFID Chest No',
+  'Remark'
 ])
 
 /* ===================== FETCH DATA ===================== */
@@ -88,15 +90,17 @@ const loadRaceResult = async () => {
   }
 }
 
-
 const filteredDetailData = computed(() => {
   return detailData.value.map(row => {
     const filteredRow: Record<string, any> = {}
 
-    selectedColumns.value.forEach(label => {
-      const key = columnKeyMap[label]
-      if (key && row[key] !== undefined) {
-        filteredRow[label] = row[key]
+    availableColumns.forEach(label => {
+      if (selectedColumns.value.includes(label)) {
+        const key = columnKeyMap[label]
+
+        if (key && row[key] !== undefined) {
+          filteredRow[label] = row[key]
+        }
       }
     })
 
@@ -104,6 +108,11 @@ const filteredDetailData = computed(() => {
   })
 })
 
+const orderedSelectedColumns = computed(() => {
+  return availableColumns.filter(col =>
+    selectedColumns.value.includes(col)
+  )
+})
 
 
 const openDownloadConfirm = () => {
@@ -120,20 +129,57 @@ const uniqueBatchNames = computed(() => {
   ].sort()
 })
 
+const baseUrl = import.meta.env.VITE_API_BASE_URL
 const confirmDownload = async (payload: any) => {
   showConfirmModal.value = false
-  try {
-    loading.value = true
-    const type = payload.type
-    delete payload.type // remove type from payload as it's sent as query param
-    await downloadRaceReport(payload, formattedDate.value, type)
+  downloadLoading.value = true 
 
-    successAlertMessage.value = 'Report generated successfully'
-  } catch (err: any) {
-    errorAlertMessage.value =
-      err.message || 'Download failed'
+  try {
+    const type = payload.type
+    delete payload.type
+    payload.columns =  orderedSelectedColumns.value
+
+    const res = await fetch(
+      `${baseUrl}/api/raceresult/export?date=${formattedDate.value}&type=${type}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+
+    if (!res.ok) throw new Error('Download failed')
+
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+
+    const disposition = res.headers.get('content-disposition')
+    let filename = `race-results-${formattedDate.value}.${type === 'excel' ? 'xlsx' : 'pdf'}`
+
+     if (disposition && disposition.includes('filename=')) {
+      filename = disposition
+        .split('filename=')[1]
+        .replace(/"/g, '')
+    }
+
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+
+    successAlertMessage.value = 'Report downloaded successfully'
+
+  } catch (err) {
+    console.error(err)
+    errorAlertMessage.value = 'Download failed'
   } finally {
-    loading.value = false
+    downloadLoading.value = false
   }
 }
 
@@ -166,7 +212,7 @@ const hasData = computed(() => {
         </label>
 
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          <label v-for="col in availableColumns.filter(c => c !== 'RFID Chest No' && c !== 'Total Run Time')" :key="col"
+          <label v-for="col in availableColumns.filter(c => c !== 'RFID Chest No' && c !== 'Run Time' && c !== 'Remark')" :key="col"
             class="flex items-center gap-1 text-sm">
             <input type="checkbox" :value="col" v-model="selectedColumns" />
             {{ col }}
@@ -254,7 +300,8 @@ const hasData = computed(() => {
     <!-- DOWNLOAD -->
     <div v-if="hasData" class="mt-6 flex gap-4 justify-end">
       <button class="bg-green-600 text-white px-4 py-2 rounded" @click="openDownloadConfirm">
-        Download Report
+        <span v-if="downloadLoading" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+           {{ downloadLoading ? 'Downloading...' : 'Download Report' }}
       </button>
     </div>
   </div>

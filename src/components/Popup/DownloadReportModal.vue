@@ -22,7 +22,8 @@ const signs = ref({
     sign2: '',
     sign3: '',
     sign4: '',
-    sign5: ''
+    sign5: '',
+    sign6: '',
 })
 
 //const coyOptions = ['COY A', 'COY B', 'COY C', 'COY E']
@@ -55,7 +56,8 @@ const resetForm = () => {
         sign2: '',
         sign3: '',
         sign4: '',
-        sign5: ''
+        sign5: '',
+        sign6: ''
     }
     errorMsg.value = ''
 }
@@ -130,6 +132,10 @@ const resetForm = () => {
                 <div>
                     <label class="font-semibold">Sign 5</label>
                     <input v-model="signs.sign5" class="w-full border rounded px-2 py-1" />
+                </div>
+                <div>
+                    <label class="font-semibold">Sign 6</label>
+                    <input v-model="signs.sign6" class="w-full border rounded px-2 py-1" />
                 </div>
             </div>
 

@@ -14,13 +14,17 @@ export const fetchRaceResult = (date: string): any => {
 
 }
 
-export const downloadRaceReport = (payload: any, selectedDate: string, type: 'excel' | 'pdf'): any => {
+export const downloadRaceReport = (
+  payload: any,
+  selectedDate: string,
+  type: 'excel' | 'pdf'
+) => {
   return axiosInstance.post(
     '/api/raceresult/export',
     payload,
     {
       params: { date: selectedDate, type },
-      responseType: 'blob' // if downloading file
+      responseType: 'blob'
     }
   )
 }
@@ -37,7 +41,7 @@ export const columnKeyMap: Record<string, string> = {
   'Soldier Type': 'soldierType',
   'Start Time': 'startTime',
   'End Time': 'endTime',
-  'Total Run Time': 'totalRunTime',
+  'Run Time': 'totalRunTime',
   'Status': 'status',
   'Race Type': 'raceType'
 }
