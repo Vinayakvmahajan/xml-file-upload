@@ -5,13 +5,13 @@ export const saveRegistrationBulk = (payload: any[]): any => {
 }
 
 export const fetchRaceResult = (date: string): any => {
-  console.log('date in service', date);
-  return axiosInstance.get('api/raceresult/details', {
-    params: {
-      date: date
-    }
-  })
-
+  return axiosInstance
+    .get('api/raceresult/details', { params: { date } })
+    .catch((err: any) => {
+      const message =
+        err?.response?.data?.error || 'Failed to fetch race result'
+      return Promise.reject(new Error(message))
+    })
 }
 
 export const downloadRaceReport = (

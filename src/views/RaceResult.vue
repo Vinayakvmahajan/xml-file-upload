@@ -63,6 +63,8 @@ const formattedDate = computed(() => {
 })
 
 const loadRaceResult = async () => {
+  detailData.value = []
+  summaryData.value = undefined;
   if (!selectedDate.value) {
     errorAlertMessage.value = 'Please select date'
     return
@@ -82,6 +84,7 @@ const loadRaceResult = async () => {
     setTimeout(() => {
       successAlertMessage.value = ''
     }, 10000)
+
   } catch (err: any) {
     errorAlertMessage.value =
       err.message || 'Failed to fetch race result'
@@ -133,6 +136,7 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL
 const confirmDownload = async (payload: any) => {
   showConfirmModal.value = false
   downloadLoading.value = true 
+  successAlertMessage.value = ''
 
   try {
     const type = payload.type
@@ -150,7 +154,13 @@ const confirmDownload = async (payload: any) => {
       }
     )
 
-    if (!res.ok) throw new Error('Download failed')
+    if (!res.ok) {
+      const errorText = await res.json();
+      const errorMessage = errorText.error || 'Failed to download report';
+      throw new Error(
+        errorMessage
+      )
+    }
 
     const blob = await res.blob()
     const url = window.URL.createObjectURL(blob)
@@ -177,7 +187,7 @@ const confirmDownload = async (payload: any) => {
 
   } catch (err) {
     console.error(err)
-    errorAlertMessage.value = 'Download failed'
+    errorAlertMessage.value = err instanceof Error ? err.message : 'Failed to download report'
   } finally {
     downloadLoading.value = false
   }
@@ -240,6 +250,7 @@ const hasData = computed(() => {
               <th class="border px-2 py-1 bg-yellow-100"> Super Excellent </th>
               <th class="border px-2 py-1 bg-yellow-100"> Excellent </th>
               <th class="border px-2 py-1 bg-yellow-100"> Good </th>
+              <th class="border px-2 py-1 bg-yellow-100"> Satisfactory </th>
               <th class="border px-2 py-1 bg-yellow-100"> Fail </th>
               <th class="border px-2 py-1 bg-yellow-100"> Total </th>
             </tr>
@@ -257,6 +268,9 @@ const hasData = computed(() => {
               </td>
               <td class="border px-2 py-1">
                 {{ summaryData.good }}
+              </td>
+              <td class="border px-2 py-1">
+                {{ summaryData.satisfactory }}
               </td>
               <td class="border px-2 py-1">
                 {{ summaryData.fail }}
