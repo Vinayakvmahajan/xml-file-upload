@@ -261,7 +261,7 @@ const validateAll = () => {
 
       /* Army No */
       if (target === 'Army No') {
-        if (!/^[a-z0-9]+$/i.test(val))
+        if (!/^[a-z0-9\s\-_/#+]+$/i.test(val))
           cellErrors.value[key] = 'Alphanumeric only'
         if (armySet.has(val))
           cellErrors.value[key] = 'Duplicate Army No'
@@ -275,19 +275,19 @@ const validateAll = () => {
       }
 
       /* Date of Birth */
-     const DOB_REGEX = /^((0[1-9]|[12][0-9]|3[01])([\/._-])(0[1-9]|1[0-2])\3(\d{4}|\d{2})|(0?[1-9]|1[0-2])([\/._-])(0?[1-9]|[12][0-9]|3[01])\7\d{2})$/
+     const DOB_REGEX = /^((0?[1-9]|[12][0-9]|3[01])[\/._-](0?[1-9]|1[0-2])[\/._-](\d{2}|\d{4})|([0-9]{1,2})\s(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|September|Oct|October|Nov|November|Dec|December)\s\d{4})$/i
 
 
       if (target === 'Date of Birth') {
         if (!DOB_REGEX.test(val)) {
           cellErrors.value[key] =
-            'Invalid DOB format. Allowed: DD/MM/YYYY, DD.MM.YY, DD-MM-YY, DD_MM_YY ,MM/DD/YY ,M/D/YY'
+            'Invalid Date of Birth format. Allowed formats: DD/MM/YYYY, DD-MM-YY, DD.MM.YY, DD_MM_YY, MM/DD/YY, M/D/YY, DD MMM YYYY'
         }
       }
 
       /* Gender */
-      if (target === 'Gender' && !['Male', 'Female'].includes(val))
-        cellErrors.value[key] = 'Male / Female only'
+      if (target === 'Gender' && !['Male', 'Female','male','female','M','F','m','f'].includes(val))
+        cellErrors.value[key] = "Only 'Male', 'Female','male','female','M','F','m','f' are allowed"
 
 
       if (target === 'COY / Batch Name') {

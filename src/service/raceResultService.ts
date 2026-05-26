@@ -4,9 +4,10 @@ export const saveRegistrationBulk = (payload: any[]): any => {
   return axiosInstance.post('/api/registration/bulk/upload', payload)
 }
 
-export const fetchRaceResult = (date: string): any => {
+export const fetchRaceResult = (date: string,
+  sortBy?: string): any => {
   return axiosInstance
-    .get('api/raceresult/details', { params: { date } })
+    .get('api/raceresult/details', { params: { date ,...(sortBy?.trim() && { sortBy })} })
     .catch((err: any) => {
       const message =
         err?.response?.data?.error || 'Failed to fetch race result'

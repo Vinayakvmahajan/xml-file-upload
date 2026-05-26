@@ -22,6 +22,7 @@ const detailData = ref<any[]>([])
 
 const showConfirmModal = ref(false)
 const popUpMsg = ref('')
+const sortBy = ref('')
 
 /* ===================== COLUMNS ===================== */
 const availableColumns = [
@@ -74,7 +75,7 @@ const loadRaceResult = async () => {
     loading.value = true
     errorAlertMessage.value = ''
 
-    const response = await fetchRaceResult(formattedDate.value)
+    const response = await fetchRaceResult(formattedDate.value,sortBy.value)
 
     detailData.value = response || []
     summaryData.value = response[0].raceResultSummaryDto || []
@@ -143,8 +144,17 @@ const confirmDownload = async (payload: any) => {
     delete payload.type
     payload.columns =  orderedSelectedColumns.value
 
+    const queryParams = new URLSearchParams({
+      date: formattedDate.value,
+      type
+    })
+
+    if (sortBy.value !== '') {
+      queryParams.append('sortBy', sortBy.value)
+    }
+
     const res = await fetch(
-      `${baseUrl}/api/raceresult/export?date=${formattedDate.value}&type=${type}`,
+      `${baseUrl}/api/raceresult/export?${queryParams.toString()}`,
       {
         method: 'POST',
         headers: {
@@ -216,6 +226,9 @@ const hasData = computed(() => {
         <input type="date" v-model="selectedDate" class="w-full border rounded px-3 py-2" />
       </div>
 
+      
+
+
       <div class="md:col-span-2">
         <label class="block text-sm font-medium mb-2">
           Select Columns
@@ -226,6 +239,32 @@ const hasData = computed(() => {
             class="flex items-center gap-1 text-sm">
             <input type="checkbox" :value="col" v-model="selectedColumns" />
             {{ col }}
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium mb-2">
+          Sort By
+        </label>
+
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2">
+            <input
+              type="radio"
+              v-model="sortBy"
+              value="totalRunTime"
+            />
+            Total Run Time
+          </label>
+
+          <label class="flex items-center gap-2">
+            <input
+              type="radio"
+              v-model="sortBy"
+              value="chestNumber"
+            />
+            RFID/Chest No
           </label>
         </div>
       </div>
